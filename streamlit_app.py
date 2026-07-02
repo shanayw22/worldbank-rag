@@ -8,7 +8,7 @@ import faiss
 import pickle
 import os
 from sentence_transformers import SentenceTransformer
-import openai
+from openai import OpenAI
 
 # Page configuration
 st.set_page_config(
@@ -75,7 +75,7 @@ def load_resources():
         data_dir = os.path.join(os.path.dirname(__file__), "data")
         index = faiss.read_index(os.path.join(data_dir, "faiss.index"))
         
-        # Load metadata
+        # Load metadata (now a simple list of dictionaries)
         with open(os.path.join(data_dir, "metadata.pkl"), "rb") as f:
             metadata = pickle.load(f)
         
@@ -90,8 +90,8 @@ try:
         st.error("🔐 OpenAI API key not configured. Please add it to Streamlit secrets.")
         st.stop()
     
-    # Set OpenAI API key
-    openai.api_key = st.secrets["OPENAI_API_KEY"]
+    # Initialize OpenAI client
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
     
     # Load resources
     index, metadata, embedding_model = load_resources()
@@ -140,8 +140,8 @@ Question: {query}
 
 Answer:"""
     
-    # Call OpenAI API
-    response = openai.ChatCompletion.create(
+    # Call OpenAI API (updated to new client format)
+    response = client.chat.completions.create(
         model="gpt-4-turbo-preview",
         messages=[
             {"role": "system", "content": "You are a World Bank expert assistant."},
