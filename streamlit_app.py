@@ -27,12 +27,20 @@ st.markdown("""
 Ask questions about World Bank projects, policies, and data. This RAG system uses:
 * 📚 **29,212 World Bank documents** (Bronze, Silver, Gold layers)
 * 🔍 **FAISS vector search** for semantic retrieval
-* 🤖 **GPT-4 Turbo** for intelligent responses
+* 🤖 **GPT-4o-mini** for intelligent responses
 """)
 
 # Sidebar
 with st.sidebar:
     st.header("⚙️ Configuration")
+    
+    # Model selection
+    model_option = st.selectbox(
+        "AI Model",
+        ["gpt-4o-mini", "gpt-3.5-turbo", "gpt-4o"],
+        index=0,
+        help="gpt-4o-mini: Best balance of quality & cost (recommended)"
+    )
     
     # Temperature slider
     temperature = st.slider(
@@ -55,12 +63,20 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("### 📊 System Info")
-    st.markdown("""
+    st.markdown(f"""
     * **Documents:** 29,212
     * **Vector Store:** FAISS
     * **Embeddings:** BAAI/bge-small-en-v1.5
-    * **LLM:** GPT-4 Turbo
+    * **LLM:** {model_option}
     """)
+    
+    # Model cost info
+    if model_option == "gpt-4o-mini":
+        st.info("💰 Cost: ~$0.15 per 1M tokens (cheapest)")
+    elif model_option == "gpt-3.5-turbo":
+        st.info("💰 Cost: ~$0.50 per 1M tokens")
+    else:
+        st.info("💰 Cost: ~$2.50 per 1M tokens (best quality)")
     
     if st.button("🗑️ Clear Chat"):
         st.session_state.messages = []
@@ -88,6 +104,13 @@ try:
     # Check for OpenAI API key
     if "OPENAI_API_KEY" not in st.secrets:
         st.error("🔐 OpenAI API key not configured. Please add it to Streamlit secrets.")
+        st.info("""
+        **How to add your API key:**
+        1. Click ⚙️ Settings (top right)
+        2. Go to "Secrets" tab
+        3. Add: `OPENAI_API_KEY = "sk-proj-your-key"`
+        4. Get a key at: https://platform.openai.com/api-keys
+        """)
         st.stop()
     
     # Initialize OpenAI client
@@ -100,6 +123,8 @@ try:
     
 except Exception as e:
     st.error(f"❌ Error loading resources: {str(e)}")
+    import traceback
+    st.code(traceback.format_exc())
     st.stop()
 
 def retrieve_documents(query: str, k: int = 5):
@@ -120,8 +145,8 @@ def retrieve_documents(query: str, k: int = 5):
     
     return documents
 
-def generate_response(query: str, context_docs: list, temp: float = 0.3):
-    """Generate response using OpenAI GPT-4"""
+def generate_response(query: str, context_docs: list, model: str, temp: float = 0.3):
+    """Generate response using OpenAI"""
     # Build context from retrieved documents
     context = "\n\n".join([
         f"Document {i+1}:\n{doc.get('text', doc.get('content', 'N/A'))}"
@@ -140,9 +165,9 @@ Question: {query}
 
 Answer:"""
     
-    # Call OpenAI API (updated to new client format)
+    # Call OpenAI API
     response = client.chat.completions.create(
-        model="gpt-4-turbo-preview",
+        model=model,
         messages=[
             {"role": "system", "content": "You are a World Bank expert assistant."},
             {"role": "user", "content": prompt}
@@ -179,7 +204,7 @@ if query := st.chat_input("Ask about World Bank projects, policies, or data...")
                 context_docs = retrieve_documents(query, k=top_k)
                 
                 # Generate response
-                response = generate_response(query, context_docs, temp=temperature)
+                response = generate_response(query, context_docs, model_option, temp=temperature)
                 
                 # Display response
                 st.markdown(response)
@@ -200,6 +225,9 @@ if query := st.chat_input("Ask about World Bank projects, policies, or data...")
                 
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
+                import traceback
+                with st.expander("🔍 Full Error Details"):
+                    st.code(traceback.format_exc())
 
 # Example questions
 st.markdown("---")
@@ -228,7 +256,7 @@ with col2:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center'>
-    <p>Built with Databricks RAG Pipeline | Powered by GPT-4 Turbo & FAISS</p>
+    <p>Built with Databricks RAG Pipeline | Powered by OpenAI & FAISS</p>
     <p>29,212 World Bank documents | Medallion Architecture (Bronze/Silver/Gold)</p>
 </div>
 """, unsafe_allow_html=True)
